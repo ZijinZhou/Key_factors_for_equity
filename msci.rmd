@@ -1,0 +1,433 @@
+---
+title: "Key risk factors for equities"
+author: "Zijin Zhou"
+date: "2019/11/14"
+output:
+  word_document:
+    toc: yes
+  html_notebook:
+    toc: yes
+  pdf_document:
+    toc: yes
+  html_document: default
+---
+
+```{r echo = FALSE}
+setwd("C:/Users/Zijin/Desktop/proj_DA")
+msci_na <- read.csv("msci_na.csv")
+msci_europe <- read.csv("msci_europe.csv")
+msci_uk <- read.csv("msci_uk.csv")
+msci_japan <- read.csv("msci_japan.csv")
+msci_EMLatin <- read.csv("msci_EM.Latin.csv")
+msci_EMEurope <- read.csv("msci_EMEurope.csv")
+msci_EMAsia <- read.csv("msci_EM.Asia.csv")
+```
+```{r message = FALSE, echo = FALSE}
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(stringr)
+library(knitr)
+```
+
+# 1.Introduction
+  For investors, finding the key risk factors of the equities is critical for their investment choices. The analysis of equities in any investment process includes a top-down part and a bottom-up part. The "top-down" section focuses on studying the macro risk environment and its impact on the key risk factors driving most asset returns, and determining the optimal portfolio exposure for these risk factors. On the other hand, the bottom-up assessment of the relative value of individual securities and companies will clarify the choice of specific securities. A good investment process should excel in both dimensions. The focus in this project is the top-down process.  
+  
+## Research question    
+  What is the role of sectors, and what is the role of countries or regions, in this risk decomposition?  
+  It is acknowledged that the equity markets are highly related to their countries or regions because they are affected by the common currency and fiscal policies of those countries or regions. However, companies in certain industries can also be affected by global trends of their industries, no matter where they are registered. For instance, Industries such as technology, major pharmaceuticals, energy, and commodities are far more globalized than banks, utilities, and retail. Therefore, some discussions are required to figure out whether the regional effect or the sector effect dominates as the componient of equities' risk factor. This is the problem I want to solve in this project. 
+  
+## Data and method   
+  The project will use three linear regression models to determine the extent to which regional markets and industry markets affect the excess returns of securities. Model 1 only analyze the relationship between the excess return of the world market as a whole and of a certain industry in a certain region. Model 2 is divided into two parts in order to discuss the effect of sector market and region market seperately. In model 2a, the excess return of a certain sector market is added to model 1 as one of the independent variables. In model 2b, the excess return of the regional market is added to model 1 as one of the independent variables. Both sector factor and regional factor are added to model 1 in model 3. Each model runs 66 times (see the data collection part below) as there are 66 pairs of data for each sector in each region.   
+  The project checks the average of r-squared of the regression results in each regression models group by different sectors and regions to figure out which model fits better and then the effect of two factors.
+  
+# 2.Dataset and variables 
+## Data collection
+  The returns on the MSCI family of indices are used for all regression results for equity returns.     
+  The world equity index is represented by the MSCI ACWI Index. The 10 sectors we consider are the following GICS Level 1 sectors: materials, energy, industrials, information technology, consumer staples, consumer durables, financials, telecom services, utilities, and health care. The seven regions we consider are North America, Europe ex United Kingdom, United Kingdom, Japan, Emerging Markets (EM) Asia, Emerging Markets (EM) Latin America, and Emerging Markets (EM) Europe. Therefore, in all, we have 70 region-sector pairs, from which 4 pairs are excluded because of irregular data availability, so the empirical analysis contains 66 region-sector pairs. The excluded pairs are EM Latin America Information Technology, EM Latin America Health Care, EM Europe Information Technology, and EM Europe Health Care. All returns are monthly returns measured in US dollars. The short-term riskless rate is the US dollar short-term riskless rate.     
+  The sample period is Feburary 1999–October 2018. All the data are collected from bloomberg terminal.
+
+## Variables 
+### Dependent variables
+  The excess returns of MSCI indexes of a certain sector in a certain region in the 66 pairs. The returns of the MSCI indexes are calculated by the natural logarithm and the excess returns can be got by the difference between the return of index and the last period of non-risk return. The price of the index - P; the excess return of the index - R; the non-risk return - r.
+$$R_t = ln(\frac{P_{t}}{P_{t-1}})*100-r_{t-1}$$
+  *excess_return* represents for $R_t$ in the R chunk.
+  
+### Independent variables
+Model 1: the excess return of MSCI ACWI Index. World equity market factor-*WD_market*    
+Model 2a: the excess return of MSCI ACWI Index and of the MSCI index of a certain sector. *WD_market* and broad sector factor-*sector_market*   
+Model 2a: the excess return of MSCI ACWI Index and of the MSCI index of a certain region. *WD_market* and regional factor-*region_market*
+Model 3: the excess return of MSCI ACWI Index, of the MSCI index of a certain sector and of the MSCI index of a certain region.*WD_market*, *region_market* and *sector_market* 
+
+The calculation methods of each excess return are as below: 
+
+$$R_{wd(t)} = ln(\frac{P_{wd(t)}}{P_{wd(t-1)}})*100-r_{t-1}$$
+
+$$R_{sector(t)} = ln(\frac{P_{sector(t)}}{P_{sector(t-1)}})*100-R_{wd(t)}$$
+$$R_{region(t)} = ln(\frac{P_{region(t)}}{P_{region(t-1)}})*100-R_{wd(t)}$$
+The price of the index - P; the excess return of the index - R; the non-risk return - r.
+
+# 3.Descriptive statistics
+
+```{r echo = FALSE}
+msci_gather_na <- msci_na %>%
+  gather("North.America_industrial","North.America_energy", "North.America_telecom", "North.America_IT", "North.America_health.care","North.America_material","North.America_consumer.staple", "North.America_utility", "North.America_finance","North.America_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_IT", "WD_health.care","WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("North.America",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_na) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+
+msci_gather_europe <- msci_europe %>%
+  gather("Europe_industrial","Europe_energy", "Europe_telecom", "Europe_IT", "Europe_health.care","Europe_material","Europe_consumer.staple", "Europe_utility", "Europe_finance","Europe_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_IT", "WD_health.care","WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("Europe",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_europe) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+
+msci_gather_uk <- msci_uk %>%
+  gather("UK_industrial","UK_energy", "UK_telecom", "UK_IT", "UK_health.care","UK_material","UK_consumer.staple", "UK_utility", "UK_finance","UK_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_IT", "WD_health.care","WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("UK",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_uk) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+
+msci_gather_japan <- msci_japan %>%
+  gather("Japan_industrial","Japan_energy", "Japan_telecom", "Japan_IT", "Japan_health.care","Japan_material","Japan_consumer.staple", "Japan_utility", "Japan_finance","Japan_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_IT", "WD_health.care","WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("Japan",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_japan) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+
+msci_gather_EMLatin <- msci_EMLatin %>%
+  gather("EM.Latin_industrial","EM.Latin_energy", "EM.Latin_telecom", "EM.Latin_material","EM.Latin_consumer.staple", "EM.Latin_utility", "EM.Latin_finance","EM.Latin_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("EM.Latin",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_EMLatin) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+
+msci_gather_EMEurope <- msci_EMEurope %>%
+  gather("EM.Europe_industrial","EM.Europe_energy", "EM.Europe_telecom", "EM.Europe_material","EM.Europe_consumer.staple", "EM.Europe_utility", "EM.Europe_finance","EM.Europe_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("EM.Europe",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_EMEurope) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+
+msci_gather_EMAsia <- msci_EMAsia %>%
+  gather("EM.Asia_industrial","EM.Asia_energy", "EM.Asia_telecom", "EM.Asia_IT", "EM.Asia_health.care","EM.Asia_material","EM.Asia_consumer.staple", "EM.Asia_utility", "EM.Asia_finance","EM.Asia_consumer.durable", "WD_industrial","WD_energy", "WD_telecom", "WD_IT", "WD_health.care","WD_material","WD_consumer.staple", "WD_utility", "WD_finance","WD_consumer.durable",key = "area_sector", value = "msci") %>%
+  separate(area_sector, into=c("area","sector"),sep="_")%>%
+  spread(key = "area", msci) %>%
+  gather("EM.Asia",key="region",value = msci) %>%
+  unite(region_sector,region,sector,sep = "_")
+colnames(msci_gather_EMAsia) <- c("date","non_risk","WD_market1","WD_market","region_market","region_sector","sector_market","excess_return")
+```
+
+  Table 1 provides the mean of excess return of global market and the non-risk return through the time. The non-risk return is about 1.94% and the mean of excess return of global market is about -1.72%. The results indicate that though the return of global MSCI index can be positive through 20 years, the average excess return of the equity market compared to non-risk return from 1999 to 2018 is negative.
+  
+**Table 1**
+```{r echo = FALSE}
+msci_gather <- rbind(msci_gather_na,msci_gather_europe,msci_gather_uk,msci_gather_japan,msci_gather_EMLatin,msci_gather_EMEurope,msci_gather_EMAsia) %>%
+  select(date, non_risk, WD_market, region_sector, excess_return, region_market, sector_market)
+
+msci_gather %>%
+  summarize(mean(WD_market),mean(non_risk)) %>%
+  kable()
+```
+
+  Table 2 provides the mean of excess return of each region. The average excess return of equity market in emerging regions is higher than developed market. Europe, Japan and UK even have the negative excess return on average, while all the emerging market listed in the table are with a positive excess returns. Emerging Latin America is the region with the highest excess return of MSCI index from 1999 to 2018, which is a high 0.37%. This statistic is reasonable because the economy of emerging regions has been developing rapidly in the recent 20 years, showing a high excess return on equity market as a whole. 
+
+**Table 2**
+```{r echo = FALSE}
+msci_gather %>%
+  separate(region_sector, into=c("area","sector"),sep="_")%>%
+  group_by(area)%>%
+  summarize(mean(region_market)) %>%
+  kable()
+```
+
+  Table 3 provides the mean of excess return of each sector. For most of the sectors, there is not much difference between the excess return, ranging from 0.1-0.2%, positive. It indicates that the development of most sectors market did not vary too much. However, in the industry of finance, telecommunication and utility, the excess returns are negative. Telecommunication industry even gets a -0.46% which is the lowest excess return among all the sectors. 
+  
+**Table 3**
+```{r echo = FALSE}
+msci_gather %>%
+  separate(region_sector, into=c("area","sector"),sep="_")%>%
+  group_by(sector)%>%
+  summarize(mean(sector_market)) %>%
+  kable()
+```
+
+# 4.Models
+
+## Model1
+  The model with the world equity market factor alone is the following:   
+$$R(i,j)_{t} = \alpha(i,j)+\beta_1(i,j)R_{wd(t)} + \epsilon(i,j)$$
+$$1 \leq i \leq N_s(j) , 1 \leq i \leq N_r, t = 1,2,...,T-1$$
+  where $R(i,j)_t$ denotes the total excess return at the end of month t on the index of firms in sector i and region j, $N_S(j)$ denotes the number of sectors in the sample for region j, and $N_r$ denotes the number of regions in the sample. Moreover, $\alpha(i, j)$ is the intercept of the
+regression; $\beta_1(i, j)$ is the world equity market beta; and $\epsilon(i, j)$ is the error term that is assumed to satisfy the usual conditions. 
+
+  Take the North.America_industrial as an example, the regression results are as Table 4:   
+
+**Table 4**
+```{r echo = FALSE}
+example <- msci_gather %>%
+  filter(region_sector == "North.America_industrial")
+lm<- summary(lm(excess_return~WD_market, data = example))
+kable(lm$coefficient)
+kable(c("r-sq",lm$r.squared))
+```
+
+  The result indicates that with one percent increase of world market's excess return, the excess return of North.America_industrial increases about 0.81% on average and the result is statistically significant. The adjusted R-squared is 61.25%,suggesting that we can explain 61.25 percent of the variation in excess return of North.America_industrial with excess return of world market.  
+  The regression model run 66 times as there are 66 pairs of regions and sectors. The r-squared and $\beta_1$ are extracted from the results, counted the average by sectors and regions seperately. The results of r-squared are as below (Table5 and Table6). All the average will be put into a single table after getting the results from all the models.
+  
+```{r echo = FALSE}
+#by area
+msci_split <- split(msci_gather,msci_gather$region_sector)
+summary_1 <- msci_split %>%
+  map(~lm(excess_return~WD_market, data = .))%>%
+  map(summary)
+
+r_sq_1 <- summary_1 %>%
+  map_dbl("r.squared")%>%
+  as.data.frame()%>%
+  round(2)%>%
+  tibble::rownames_to_column("area_sector") %>%
+  separate(area_sector, into = c("area","sector"), sep = "_")
+colnames(r_sq_1) <- c("area","sector","r_sq")
+
+r_sq_area_1 <- r_sq_1 %>%
+  group_by(area) %>%
+  summarise(r_sq_1=mean(r_sq))
+r_sq_sector_1 <- r_sq_1 %>%
+  group_by(sector) %>%
+  summarise(r_sq_1=mean(r_sq))
+```
+**Table 5**   
+The average of r-squared in model 1 by regions
+```{r echo = FALSE}
+em_r_sq_area_1 <- r_sq_area_1 %>%
+  filter(area == "EM.Asia" |area == "EM.Latin"|area == "EM.Europe")%>%
+  summarize(mean(r_sq_1))%>%
+  round(2)
+
+d_r_sq_area_1 <- r_sq_area_1 %>%
+  filter(area == "North.America" |area == "UK"|area == "Europe"|area == "Japan")%>%
+  summarize(mean(r_sq_1))%>%
+  round(2)
+
+all_r_sq_area_1 <- r_sq_area_1 %>%
+  summarize(mean(r_sq_1))%>%
+  round(2)
+```
+```{r echo = FALSE}
+stat1 <- tibble(unlist(c(all_r_sq_area_1,em_r_sq_area_1,d_r_sq_area_1)))
+colnames(stat1) <- c("r_sq")
+region <- c("world market","emerging market","developed market")
+kable(cbind(region,stat1))
+```
+```{r echo = FALSE}
+kable(r_sq_area_1 %>%
+  mutate(r_sq_1 = round(r_sq_1,2)))
+```
+
+**Table 6**   
+The average of r-squared in model 1 by sectors
+```{r echo = FALSE}
+kable(r_sq_sector_1 %>%
+  mutate(r_sq_1 = round(r_sq_1,2)))
+```
+  
+  In model1, we see the average r-sq of the market model regressions (referenced below as Equity Model 1), where the average is taken over different sets of region × sector indices. The full sample average R2 (i.e., average R2 over all 66 regressions) is 48%, the average R2 for all developed markets regressions is 47%, and the average R2 for all of the emerging market indices in our sample is 49%. Thus, world equity market beta explains less than half of the variations in the returns of relatively homogeneous region-sector portfolios. Among developed markets, Europe ex United Kingdom has the highest proportion explained by the world market factor, followed by UK. For sector portfolios in Japan, the average R2 for Model 1 is only 34%, confirming the existence of a nontrivial local effect in Japan. Among sectors, health care and utilities exhibit a poorer fit than others, suggesting that sector- or region-specific effects might play a prominent role in explaining variations in their returns.
+
+## Model 2a
+  The model with a world market factor and broad sector factors is as follows:
+$$R(i,j)_{t} = \alpha(i,j)+\beta_1(i,j)R_{wd(t)} + \beta_{2a}(i,j)R(i)_{sector(t)}+ \epsilon(i,j)$$
+  $\beta_{2a}(i, j)$ is the sector coefficient of the portfolio of equities in the equity index for sector i and region j; and $R(i)_{sector(t)}$ is excess return on the index of the ith global sector. All other variables are as defined for model1.
+
+  Also, take North.America_industrial as an example for model 2a. The redults are as Table 7:   
+
+**Table 7**
+```{r echo = FALSE}
+kable(summary(lm(excess_return~WD_market + sector_market, data = example))$coefficient)
+kable(c("r-sq",summary(lm(excess_return~WD_market + sector_market, data = example))$r.squared))
+```
+  
+  The result indicates that net of sector factor, with one percent increase of world market's excess return, the excess return of North.America_industrial increases about 0.81% on average and the result is statistically significant, which is not too much different from model1. As for the sector factor, net of the world market factor, one percent of increase of the excess return of sector factor make the excess return of North.America_industrial increase by 0.73% on average and the result is also statistically significant. The adjusted R-squared is 69.92%,suggesting that we can explain 69.92 percent of the variation in excess return of North.America_industrial with both the excess return of world market and sector market. It shows that model 2a increase the fitness of the model slightly.
+
+```{r echo = FALSE}
+r_sq_2a <- msci_split %>%
+  map(~lm(excess_return~WD_market+sector_market, data = .))%>%
+  map(summary)%>%
+  map_dbl("r.squared")%>%
+  as.data.frame()%>%
+  tibble::rownames_to_column("area_sector") %>%
+  separate(area_sector, into = c("area","sector"), sep = "_")
+colnames(r_sq_2a) <- c("area","sector","r_sq")
+
+r_sq_area_2a <- r_sq_2a %>%
+  group_by(area) %>%
+  summarise(r_sq_2a=mean(r_sq))
+
+r_sq_sector_2a <- r_sq_2a %>%
+  group_by(sector) %>%
+  summarise(r_sq_2a=mean(r_sq))
+```
+
+## Model 2b
+  The model with a world market factor and region factors is as follows:
+$$R(i,j)_{t} = \alpha(i,j)+\beta_1(i,j)R_{wd(t)} + \beta_{2b}(i,j)R(j)_{region(t)}+ \epsilon(i,j)$$
+  $\beta_{2b}(i, j)$ is the region coefficient of the portfolio of equities in the equity index for sector i and region j; and $R(j)_{region(t)}$ is excess return on the index of the jth region. All other variables are as defined for model1.  
+  
+  The example of North.America_industrial as Table 8:   
+**Table 8**
+```{r echo = FALSE}
+kable(summary(lm(excess_return~WD_market + region_market, data = example))$coefficient)
+lm2<- summary(lm(excess_return~WD_market + region_market, data = example))
+kable(c("r-sq",lm2$r.squared))
+```
+  
+  The result indicates that net of region factor, with one percent increase of world market's excess return, the excess return of North.America_industrial increases about 0.84% on average and the result is statistically significant, which enhances compared to model1. As for the region factor, net of the world market factor, one percent of increase of the excess return of sector factor make the excess return of North.America_industrial increase by 0.68% on average and the result is also statistically significant. This coefficient $\beta_{2b}$ is less than $\beta_{2a}$ in model 2a. The adjusted R-squared is 63.51%, showing that though it increases compared to model1, model 2b does not increase the fitness of the model as much as model 2a.
+
+```{r echo = FALSE}
+r_sq_2b <- msci_split %>%
+  map(~lm(excess_return~WD_market+region_market, data = .))%>%
+  map(summary)%>%
+  map_dbl("r.squared")%>%
+  as.data.frame()%>%
+  tibble::rownames_to_column("area_sector") %>%
+  separate(area_sector, into = c("area","sector"), sep = "_")
+colnames(r_sq_2b) <- c("area","sector","r_sq")
+
+r_sq_area_2b <- r_sq_2b %>%
+  group_by(area) %>%
+  summarise(r_sq_2b=mean(r_sq))
+
+r_sq_sector_2b <- r_sq_2b %>%
+  group_by(sector) %>%
+  summarise(r_sq_2b=mean(r_sq))
+```
+
+## Model 3
+  The model with a world market factor and region factors is as follows:
+$$R(i,j)_{t} = \alpha(i,j)+\beta_1(i,j)R_{wd(t)} + \beta_{2}(i,j)R(i)_{region(t)}+ \beta_{3}(i,j)R(j)_{region(t)}+ \epsilon(i,j)$$
+  $\beta_{2}(i, j)$ is the sector coefficient of the portfolio of equities in the equity index for sector i and region j; $\beta_{3}(i, j)$ is the region coefficient of the portfolio of equities in the equity index for sector i and region j.
+  
+  The example of North.America_industrial as Table 9:   
+
+**Table 9**
+```{r echo = FALSE}
+lm3 <- lm(excess_return ~ WD_market+ sector_market + region_market, data = example)
+kable(summary(lm3)$coefficient)
+kable(c("r-sq",summary(lm3)$r.squared))
+```
+  
+  Net of region factor and sector factor, with one percent increase of world market's excess return, the excess return of North.America_industrial increases about 0.84% on average and the result is statistically significant. As for the region factor, net of other factors, one percent of increase of the excess return of sector factor make the excess return of North.America_industrial increase by 0.72% on average and the result is also statistically significant, while 0.65% for the region factor. The adjusted R-squared is about 72%, showing a obvious improvement of fitness of the model.
+  
+```{r echo = FALSE}
+r_sq_3 <- msci_split %>%
+  map(~lm(excess_return~WD_market+sector_market+region_market, data = .))%>%
+  map(summary)%>%
+  map_dbl("r.squared")%>%
+  as.data.frame()%>%
+  tibble::rownames_to_column("area_sector") %>%
+  separate(area_sector, into = c("area","sector"), sep = "_")
+colnames(r_sq_3) <- c("area","sector","r_sq")
+
+r_sq_area_3 <- r_sq_3 %>%
+  group_by(area) %>%
+  summarise(r_sq_3=mean(r_sq))
+
+r_sq_sector_3 <- r_sq_3 %>%
+  group_by(sector) %>%
+  summarise(r_sq_3=mean(r_sq))
+```
+
+The average r-squared of world market is listed in Table 10. And the average r-sq by region and sector of all four models are listed in Table 11 and Table 12.
+```{r echo = FALSE}
+#by area
+by_area <- cbind(r_sq_area_1,r_sq_area_2a$r_sq_2a,r_sq_area_2b$r_sq_2b,r_sq_area_3$r_sq_3)
+colnames(by_area) <- c("area","model 1","model 2a","model 2b","model 3")
+
+#by sector
+by_sector <- cbind(r_sq_sector_1,r_sq_sector_2a$r_sq_2a,r_sq_sector_2b$r_sq_2b,r_sq_sector_3$r_sq_3)
+colnames(by_sector) <- c("sector","model 1","model 2a","model 2b","model 3")
+```
+
+**Table 10**   
+Average r-sq of world market.
+```{r echo = FALSE}
+kable(by_area %>%
+  summarize(`model 1`=mean(`model 1`),`model 2a`=mean(`model 2a`),`model 2b`=mean(`model 2b`),`model 3`=mean(`model 3`))%>%
+  round(2)
+  )
+```
+  
+  The results show that including sector effects increases the average R2 from 48% to 60% while including regional effects increases the average R2 to 65%. Thus, from an aggregate perspective, regional effects seem somewhat more important than sector or industry effects.  
+
+**Table 11**
+```{r echo = FALSE}
+kable(by_area%>%
+        mutate(`model 1`= round(`model 1`,2),`model 2a`= round(`model 2a`,2),`model 2b`= round(`model 2b`,2),`model 3`= round(`model 3`,2))
+      )
+```
+
+  Emerging market and Japan market show the same pattern as the global market. However, in some developed region, North.America, UK and Europe ex UK, model 2a shows a higher average r-sq than model 2b, which means sector effects are more important than region effects in these areas. Noted that developed regions are usually more globalized than emerging region, it may explain the results that regional effects effect the market not as much as sector effects in developed market.
+
+**Table 12**
+```{r echo = FALSE}
+kable(by_sector%>%
+        mutate(`model 1`= round(`model 1`,2),`model 2a`= round(`model 2a`,2),`model 2b`= round(`model 2b`,2),`model 3`= round(`model 3`,2))
+      )
+```
+
+  The sectors where regional effects are less important are information technology, health care, and energy. This result is intuitive as these sectors tend to be dominated by highly global companies, and in the case of energy, these firms are highly influenced by globally determined commodity prices. Interestingly, the financial and industrial sectors turn out to be sectors where regional effects make the greatest contribution.
+
+## coefficient
+  According to the regression results, all of the coefficients of world_market factors and most of the coefficients of other factors in Model 3 are statistically significant. However, here are some exclusion.      
+  In North.America with the sectors of health.care, IT, energy and consumer.staple, sector factors are not statistically significant, which indicates that developed region as North American are not strongly affected by region factor. As what have been mentioned above, industries such as energy and consumer staple are usually with a higher level of globalization (usually happens in more developed regions). Therefore, it makes sense that some of the industries in developed region do not have a statistically significant relationship with region market factor. On the contrary to developed country, some sectors in emerging region do not show a statistically significant relationship with the sectorfactor because region markets matter more in these less globalized region. Also, sectors such as utility and industrial are more likely to be influenced by the fiscal policies or some other change of economy of the region they belong to. In this project, they are utility and industrial sector in emerging europe market and health care sector in emerging Asia market.
+
+```{r eval = FALSE, echo = FALSE}
+ss <- msci_split %>%
+  map(~lm(excess_return~WD_market+sector_market+region_market, data = .))%>%
+  map(confint)
+
+ss
+```
+
+  Regardless of the statistical significance, Table 13 shows the all the coefficients of three factors in Model 3 and the average of coefficients above it.
+**Table 13**
+```{r echo = FALSE}
+coef_3 <- msci_split %>%
+  map(~lm(excess_return~ WD_market+sector_market+region_market, data = .)) %>%
+  map(~coef(.)) %>%
+  as.data.frame() %>%
+  t()%>%
+  as.data.frame()%>%
+  select(b1=WD_market,b2=sector_market,b3=region_market) %>%
+  tibble::rownames_to_column("area_section") %>%
+  separate(area_section, into = c("area","section"), sep = "_")%>%
+  group_by(area) %>%
+  summarise(b1=mean(b1),b2=mean(b2),b3=mean(b3))
+wd_coef <- coef_3 %>%
+  summarise(b1 = mean(b1),b2=mean(b2),b3=mean(b3))
+kable(wd_coef)
+kable(coef_3)
+```
+
+All market betas are statistically significant. The
+average market beta is 0.97. (We do not expect the betas to average to exactly 1.0 because we use an equal-weighted average of the 66 market betas, one for each region-sector pair in our sample, instead of their market-weighted average.)
+Also, note that the larger a region’s or sector’s weight within the market portfolio, the more its beta should tend towards 1.0, holding everything else constant. Sector betas are smaller for Japan and emerging markets as their regional effects are particularly pronounced.
+
+
+# 5.final models
+   No matter according to which sectors, regions or the whole world market, model 3 stand outs with a higher r-sq among all the models in the discussion.    
+   Overall, the above results suggest that a high-level representation of equity markets can begin with a world equity index and then incorporate a small number of regional and global sector tilts. This approach would capture about 75% of the variation present in equity returns of region-sector
+portfolios. It should, however, be noted that the part of equity returns that is attributable to factors other than the world market portfolio, global sectors, and geographic locations is not trivial. Indeed, 75% is likely to be an
+overestimate of the size of the systematic component in equities because we are using portfolio returns as our dependent variables instead of returns on individual stocks.
+   
+# 6.conclusion
+  Recall also that all our returns are measured in US dollars and therefore will tend to overstate the country effect.
